@@ -25,7 +25,7 @@ from monai.data.image_reader import ITKReader, NibabelReader, NrrdReader, PILRea
 from monai.data.image_writer import ITKWriter, NibabelWriter, PILWriter, register_writer, resolve_writer
 from monai.data.meta_tensor import MetaTensor
 from monai.transforms import LoadImage, SaveImage, moveaxis
-from monai.utils import MetaKeys, OptionalImportError, optional_import
+from monai.utils import MetaKeys, OptionalImportError, optional_import, require_pkg
 from tests.test_utils import TEST_NDARRAYS, assert_allclose
 
 _, has_itk = optional_import("itk", allow_namespace_pkg=True)
@@ -149,6 +149,22 @@ class TestRegRes(unittest.TestCase):
         register_writer("new", lambda x: x + 1)
         register_writer("new2", lambda x: x + 1)
         self.assertEqual(resolve_writer("new")[0](0), 1)
+
+    def test_2_install_hint(self):
+
+        @require_pkg(pkg_name="monai_test_missing_pkg")
+        class MissingWriter:
+            pass
+
+        register_writer("hint_ext", MissingWriter)
+        with self.assertRaisesRegex(OptionalImportError, "monai_test_missing_pkg"):
+            resolve_writer("hint_ext")
+
+    def test_3_no_install_hint_without_pkg_name(self):
+        register_writer("nohint_ext", lambda: (_ for _ in ()).throw(OptionalImportError))
+        with self.assertRaises(OptionalImportError) as ctx:
+            resolve_writer("nohint_ext")
+        self.assertNotIn("Install one of", str(ctx.exception))
 
 
 @unittest.skipUnless(has_itk, "itk not installed")
