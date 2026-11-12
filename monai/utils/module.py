@@ -311,7 +311,18 @@ class InvalidPyTorchVersionError(Exception):
 class OptionalImportError(ImportError):
     """
     Could not import APIs from an optional dependency.
+
+    Args:
+        args: positional arguments passed to ``ImportError``, typically the error message.
+        pkg_name: name of the optional package that could not be imported, if known.
+            It is stored as ``self.pkg_name`` so that callers can build an installation hint.
+            Defaults to ``None``.
+        kwargs: keyword arguments passed to ``ImportError``, such as ``name`` and ``path``.
     """
+
+    def __init__(self, *args: Any, pkg_name: str | None = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pkg_name = pkg_name
 
 
 def optional_import(
@@ -463,6 +474,7 @@ def require_pkg(
         version_checker: a callable to check the module version, defaults to `monai.utils.min_version`.
         raise_error: if True, raise `OptionalImportError` error if the required package is not installed
             or the version doesn't match requirement, if False, print the error in a warning.
+            The raised `OptionalImportError` stores ``pkg_name`` in its ``pkg_name`` attribute.
 
     """
 
@@ -476,7 +488,7 @@ def require_pkg(
             if not has:
                 err_msg = f"required package `{pkg_name}` is not installed or the version doesn't match requirement."
                 if raise_error:
-                    raise OptionalImportError(err_msg)
+                    raise OptionalImportError(err_msg, pkg_name=pkg_name)
                 else:
                     warnings.warn(err_msg)
 
