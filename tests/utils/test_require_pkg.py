@@ -78,6 +78,19 @@ class TestRequirePkg(unittest.TestCase):
 
             test_func(x=None)
 
+    def test_exception_stores_pkg_name(self):
+
+        @require_pkg(pkg_name="test123")
+        def test_func(x):
+            return x
+
+        with self.assertRaises(OptionalImportError) as ctx:
+            test_func(x=None)
+        self.assertEqual(ctx.exception.pkg_name, "test123")
+
+    def test_exception_default_pkg_name(self):
+        self.assertIsNone(OptionalImportError("test message").pkg_name)
+
 
 if __name__ == "__main__":
     unittest.main()
