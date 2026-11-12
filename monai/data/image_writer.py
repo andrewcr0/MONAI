@@ -99,6 +99,11 @@ def resolve_writer(ext_name, error_if_not_found=True) -> Sequence:
             As an indexing key it will be converted to a lower case string.
         error_if_not_found: whether to raise an error if no suitable image writer is found.
             if True , raise an ``OptionalImportError``, otherwise return an empty tuple. Default is ``True``.
+
+    Raises:
+        OptionalImportError: When no suitable image writer is available and ``error_if_not_found`` is ``True``.
+            If the unavailable writers report the packages they require, the error message lists them
+            as an installation hint.
     """
     if not SUPPORTED_WRITERS:
         init()
@@ -106,17 +111,26 @@ def resolve_writer(ext_name, error_if_not_found=True) -> Sequence:
     if fmt.startswith("."):
         fmt = fmt[1:]
     avail_writers = []
+    missing_pkgs: list[str] = []
     default_writers = SUPPORTED_WRITERS.get(EXT_WILDCARD, ())
     for _writer in look_up_option(fmt, SUPPORTED_WRITERS, default=default_writers):
         try:
             _writer()  # this triggers `monai.utils.module.require_pkg` to check the system availability
             avail_writers.append(_writer)
-        except OptionalImportError:
+        except OptionalImportError as e:
+            if e.pkg_name and e.pkg_name not in missing_pkgs:
+                missing_pkgs.append(e.pkg_name)
             continue
         except Exception:  # other writer init errors indicating it exists
             avail_writers.append(_writer)
     if not avail_writers and error_if_not_found:
-        raise OptionalImportError(f"No ImageWriter backend found for {fmt}.")
+        msg = f"No ImageWriter backend found for {fmt}."
+        if missing_pkgs:
+            msg += (
+                f" Install one of the following optional packages to enable it: {', '.join(missing_pkgs)}."
+                " See https://monai.readthedocs.io/en/latest/installation.html#installing-the-recommended-dependencies"
+            )
+        raise OptionalImportError(msg)
     writer_tuple = ensure_tuple(avail_writers)
     SUPPORTED_WRITERS[fmt] = writer_tuple
     return writer_tuple
